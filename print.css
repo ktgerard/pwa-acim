@@ -1,0 +1,28 @@
+/* Paper replica: 11 x 8.5 in US Letter, landscape. */
+#printSheet{display:none}
+@page{size:letter landscape;margin:0.36in}
+@media print{
+ html,body{background:white!important;color:#202020!important;margin:0!important;padding:0!important}
+ body>header,body>main,body>footer{display:none!important}
+ #printSheet{display:block!important;position:static!important;width:100%!important}
+ #printSheet[hidden]{display:none!important}
+ .paper{width:100%;color:#222;font-family:Arial,Helvetica,sans-serif}
+ .form-heading{display:flex;align-items:center;justify-content:space-between;border-bottom:1.3px solid #333;padding:0 0 9px;margin-bottom:10px;height:38px}
+ .form-logo{display:flex;align-items:center;font-size:16px;letter-spacing:-.5px;gap:5px}
+ .pga-mark{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #222;font-weight:bold;font-size:10px;height:28px;width:24px}
+ .form-title{font-weight:600;font-size:17px}
+ .inventory-form{border-collapse:collapse;table-layout:fixed;width:100%;font-size:11px}
+ .inventory-form th{background:#41484b!important;color:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:1px solid #333;text-align:center;font-size:12px;line-height:1.18;padding:7px 3px;height:52px}
+ .inventory-form td{border:1px solid #333;vertical-align:middle;padding:5px 5px;overflow-wrap:anywhere;line-height:1.15}
+ .inventory-form tr.form-row{height:53px;break-inside:avoid}
+ .inventory-form td.type-cell{text-align:center;font-weight:600;font-size:12px}
+ .inventory-form td.approval-cell{padding:0;position:relative;background:linear-gradient(to bottom right,transparent calc(50% - .6px),#333 50%,transparent calc(50% + .6px)) no-repeat;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .approval-cell span{position:absolute;font-size:10px;font-weight:600}
+ .approval-cell .in-label{top:3px;left:3px}
+ .approval-cell .out-label{bottom:3px;right:3px}
+ .form-footer{margin:18px 0 0 10px}
+ .signature-line{display:flex;align-items:baseline;gap:7px;margin-bottom:27px;font-size:14px;min-height:22px}
+ .signature-line b{font-style:italic;white-space:nowrap}
+ .signature-line .typed,.signature-line .blank{display:inline-block;border-bottom:1.3px solid #222;min-width:275px;padding:0 4px 2px}
+ .signature-line .typed{font-weight:500}
+}

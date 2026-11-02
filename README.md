@@ -1,37 +1,26 @@
-# ACIM Phase 1A + 1B
+# ACIM Phase 1C — Upgrade instructions
 
-## Included
-- Supabase PostgreSQL schema, RLS and authorization allowlist
-- Email/password sign-in with one shared service-desk account
-- Associate search and active inventory lookup, checkbox selection
-- Installable PWA shell for GitHub Pages
+This is an **incremental upgrade** of the deployed Phase 1A/1B app. It retains the existing Supabase schema, data, RLS and shared service desk login. **Do not rerun the initial setup or recreate the tables.** No SQL migrations are needed for this release.
 
-**Not yet implemented:** associate/club editor, print form, visit recording, offline database editing. These are Phase 1C–1E. Checkboxes only select records on the current screen.
+1. Unzip this package. Open `config.js` and copy your existing working Supabase project URL and **publishable/anon** key from the deployed app. Never use a service-role or secret key.
+2. Upload the contents of the `ACIM_Phase1C` folder (not the folder itself) to the root of your `pwa-acim` GitHub Pages repository, replacing matching files. Keep the `icons` and `sql` folders.
+3. Wait for GitHub Pages deployment; reload the app. If the old interface persists, close and reopen the installed PWA or clear its site cache. The service worker cache version was updated.
+4. Sign in using the same shared service desk account. Confirm your existing associate is listed. Use **Add associate**, **Edit selected associate**, **Deactivate / Restore selected**, **Add club**, and club-level **Edit / Deactivate / Restore**.
+5. Check **Show inactive associates** to restore deactivated associates. Check **Show inactive clubs** to restore deactivated clubs. Inactive clubs never appear in the selection list.
 
-## Installation
-1. Create a Supabase project (or use an existing one with an isolated ACIM schema/table prefix).
-2. In SQL Editor run `sql/01_schema.sql` once.
-3. In Authentication > Providers, enable Email. Create one shared service-desk user in Authentication > Users with a strong unique password. Disable public signups in Authentication settings. Do not put its password in repository files.
-4. Copy that user's UUID from Authentication > Users. In `sql/02_setup.sql`, uncomment the allowlist `insert` statement, replace `REPLACE_WITH_AUTH_USER_UUID`, and run it in SQL Editor. The shared login cannot access data until this is done.
-5. Optionally uncomment the test associate insert for employee 503451 and run it. The test associate has no clubs until records are added.
-6. Copy Project URL and **publishable** key from Supabase project settings into `config.js`. The publishable key is intended for browser use; RLS provides access control. NEVER use service_role/secret key in frontend.
-7. Upload the **contents** of this directory (including `icons/`) to the root of a new GitHub repository, e.g. `pwa-acim`.
-8. GitHub repository Settings > Pages > Deploy from a branch > main / (root). Open the published URL and sign in.
-9. Test a non-allowlisted account: it must not read associate or club records. Test the authorized shared account and confirm associate selection works.
+## Validation checklist
 
-## Adding a test club in SQL Editor
-After optionally inserting the sample associate:
-```sql
-insert into public.acim_clubs(associate_id,club_type,quantity,head_model,loft_set_makeup,shaft_model,grip)
-select associate_id,'Driver',1,'TaylorMade Qi10 LS','9°','Ventus TR Blue 60 S','Tour Velvet'
-from public.acim_associates where employee_number='503451';
-```
+- Existing associate data remains intact.
+- Add a temporary associate, edit its name, deactivate and restore it.
+- Add a driver and an iron set; select and clear their checkboxes.
+- Edit a club; deactivate and restore it.
+- Confirm edits appear on a second signed-in device after refreshing.
+- Confirm users who are not on `acim_authorized_users` cannot read or modify the records.
 
-## Operational notes
-- This initial release needs network access to authenticate and fetch records. Cached shell files do not mean the inventory is available offline.
-- Service-worker updates may require closing/reopening the installed PWA. `config.js` is intentionally not cached.
-- This phase has no print button: the original paper layout will be built and tested in Phase 1E.
-- Shared account means all edits will appear as one login; individual accountability is not available.
-- If GitHub Pages is public, `config.js` will be publicly readable. This is expected for the publishable key; never store passwords or secret keys there.
-- The database's authorization allowlist is not accessible through the client. Maintain it from SQL Editor.
-- For production use, confirm company authorization to store employee records in Supabase and use a shared login.
+## Scope
+
+This release implements Phase 1C associate and club management. It does **not** yet print the original form, save visits, or record digital approvals. RLS policies and database schema remain unchanged from Phase 1A.
+
+## Security
+
+The shared account can read and write ACIM tables under the existing RLS policy. The shared credential is not an individual audit trail; use store-approved credential handling. The Supabase project URL and publishable key are intended to be public, but passwords and service-role keys must never go into the repository.

@@ -10,7 +10,7 @@ function formRows(items){
     const rows=items.filter(c=>c.club_type===type);
     // Preserve all six category rows, even if nothing in that category was selected.
     const list=rows.length?rows:[null];
-    return list.map((c,i)=>`<tr class="form-row"><td class="type-cell">${i===0?names[type]:''}</td>${cell(c?.quantity??'')}${cell(c?.head_model??'')}${cell(c?.loft_set_makeup??'')}${cell(c?.shaft_model??'')}${cell(c?.grip??'')}<td class="approval-cell"><span class="in-label">In</span><span class="out-label">Out</span></td></tr>`).join('');
+    return list.map((c,i)=>`<tr class="form-row"><td class="type-cell">${i===0?names[type]:''}</td>${cell(c?.quantity??'')}${cell(c?.head_model??'')}${cell(c?.loft_set_makeup??'')}${cell(c?.shaft_model??'')}${cell(c?.grip??'')}<td class="approval-cell"><svg class="approval-diagonal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="100" x2="100" y2="0" stroke="#222" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg><span class="in-label">In</span><span class="out-label">Out</span></td></tr>`).join('');
   }).join('');
 }
 function build(){

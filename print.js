@@ -25,7 +25,16 @@ function build(){
   sheet.hidden=false;
   return true;
 }
-function printForm(){if(!build())return;window.print();}
-document.getElementById('printInventory').addEventListener('click',printForm);
-window.addEventListener('afterprint',()=>{document.getElementById('printSheet').hidden=true;});
+function previewForm(){
+  if(!build())return;
+  document.getElementById('printActions').hidden=false;
+  document.getElementById('printSheet').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function closePreview(){
+  document.getElementById('printSheet').hidden=true;
+  document.getElementById('printActions').hidden=true;
+}
+document.getElementById('printInventory').addEventListener('click',previewForm);
+document.getElementById('printNow').addEventListener('click',()=>window.print());
+document.getElementById('closePrintPreview').addEventListener('click',closePreview);
 })();

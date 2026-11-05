@@ -45,10 +45,21 @@ function selectField(label, values, value, onChange){
 }
 
 async function loadLiveHeads(){
- const {data,error}=await client.rpc('acim_list_fis_heads');
- if(error){catalogLoadError=error.message;headCatalog=[];status('Live HeadDB unavailable; manual entry remains available: '+error.message,true);return;}
- headCatalog=(data||[]).map(h=>({id:h.head_id,type:h.club_type,oem:h.oem,model:h.model,year:Number(h.release_year),variant:h.variant||'Standard'}));
- catalogLoadError='';
+ const pageSize=500;
+ const rows=[];
+ try {
+  for(let offset=0;offset<20000;offset+=pageSize){
+   const {data,error}=await client.rpc('acim_list_fis_heads').range(offset,offset+pageSize-1);
+   if(error)throw Error(error.message);
+   const page=data||[];
+   rows.push(...page);
+   if(page.length<pageSize)break;
+   if(offset+pageSize>=20000)throw Error('HeadDB exceeds the 20,000-record safety limit.');
+  }
+  headCatalog=[...new Map(rows.map(h=>[h.head_id,{id:h.head_id,type:h.club_type,oem:h.oem,model:h.model,year:Number(h.release_year),variant:h.variant||'Standard'}])).values()];
+  catalogLoadError='';
+ } catch(e){catalogLoadError=e.message;headCatalog=[];status('Live HeadDB unavailable; manual entry remains available: '+e.message,true);}
+
 }
 async function getLiveLofts(headId){
  if(specsCache.has(headId))return specsCache.get(headId);

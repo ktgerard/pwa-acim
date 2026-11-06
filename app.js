@@ -27,7 +27,6 @@ async function sessionView(){const {data:{session},error}=await client.auth.getS
 async function start(){const cfg=window.ACIM_CONFIG||{};if(!cfg.supabaseUrl?.startsWith('https://')||cfg.supabaseUrl.includes('YOUR_PROJECT')||!cfg.supabasePublishableKey||cfg.supabasePublishableKey.includes('YOUR_PUBLISHABLE')){status('Configuration required: edit config.js with the Supabase project URL and publishable key.',true);return;}if(!window.supabase){status('Supabase library did not load. Check network connectivity.',true);return;}client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();status('Signing in…');const {error}=await client.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){status(`Sign-in failed: ${error.message}`,true);return;}$('password').value='';await sessionView();});
  $('signOut').addEventListener('click',async()=>{const {error}=await client.auth.signOut();if(error)status(error.message,true);else await sessionView();});$('search').addEventListener('input',renderAssociates);$('associate').addEventListener('change',loadClubs);wireManagement();$('selectAll').addEventListener('click',()=>{selected=new Set(clubs.map(c=>c.club_id));renderClubs();});$('clearAll').addEventListener('click',()=>{selected.clear();renderClubs();});
- await loadLiveHeads();
  await sessionView();if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 }
 start().catch(e=>status(`Startup failed: ${e.message}`,true));
@@ -70,29 +69,44 @@ async function getLiveLofts(headId){
 }
 
 async function editClub(c){
- await loadLiveHeads();
  const id=$('associate').value;if(!id)return status('Select an associate before adding a club.',true);
- const type=choice('club_type','Club type',order,c?.club_type);
+ // Keep the saved inventory editable even when the FIS reference service is unavailable.
+ const type=choice('club_type','Club type',order,c?.club_type||'Driver');
  const quantity=field('quantity','Quantity',c?.quantity??1,'number',true);
- const head=field('head_model','Head model (editable)',c?.head_model,'text',true);
+ const head=field('head_model','Head model / description',c?.head_model,'text',true);
  const loft=field('loft_set_makeup','Loft / set makeup',c?.loft_set_makeup);
  const shaft=field('shaft_model','Shaft model',c?.shaft_model);
  const grip=field('grip','Grip',c?.grip);
  const sort=field('sort_order','Sort order',c?.sort_order??0,'number',true);
  const catalog=document.createElement('div');catalog.className='catalog';
- const heading=document.createElement('strong');heading.textContent='FIS HeadDB reference';catalog.append(heading);
- const note=document.createElement('p');note.className='muted';note.textContent='Live FIS HeadDB reference. Choose a head or enter a model manually.';
- if(catalogLoadError)note.textContent='Live HeadDB unavailable ('+catalogLoadError+'). Manual entry remains available.';catalog.append(note);
- const older=document.createElement('label');older.className='inline-check';const check=document.createElement('input');check.type='checkbox';check.checked=false;older.append(check,document.createTextNode(' Include models before 2015'));catalog.append(older);
- const filters=document.createElement('div');catalog.append(filters);
- const loftWrap=document.createElement('label');loftWrap.textContent='Available FIS lofts (optional)';const loftSelect=document.createElement('select');loftSelect.add(new Option('Choose loft / enter manually',''));loftWrap.append(loftSelect);catalog.append(loftWrap);
- let loftRequest=0;
- async function refreshLofts(headId){const token=++loftRequest;loftSelect.replaceChildren(new Option('Choose loft / enter manually',''));if(!headId)return;try{const vals=await getLiveLofts(headId);if(token!==loftRequest)return;vals.forEach(v=>loftSelect.add(new Option(v+'°',v+'°')));}catch(e){if(token===loftRequest)status('Loft lookup unavailable: '+e.message,true);}}
- loftSelect.addEventListener('change',()=>{if(loftSelect.value)loft.querySelector('input').value=loftSelect.value;});
+ const modeLabel=document.createElement('label');modeLabel.textContent='Club entry method';
+ const mode=document.createElement('select');
+ mode.add(new Option('Select from FIS HeadDB','lookup'));
+ mode.add(new Option('Manual entry (not in HeadDB)','manual'));
+ modeLabel.append(mode);
+ const modeNote=document.createElement('p');modeNote.className='muted';
+ const lookupPanel=document.createElement('div');
+ catalog.append(modeLabel,modeNote,lookupPanel);
+ const older=document.createElement('label');older.className='inline-check';
+ const check=document.createElement('input');check.type='checkbox';
+ older.append(check,document.createTextNode(' Include models before 2015'));lookupPanel.append(older);
+ const filters=document.createElement('div');lookupPanel.append(filters);
+ const loftWrap=document.createElement('label');loftWrap.textContent='Available FIS lofts (optional)';
+ const loftSelect=document.createElement('select');loftSelect.add(new Option('Choose loft / enter manually',''));
+ loftWrap.append(loftSelect);lookupPanel.append(loftWrap);
  const selectedId=document.createElement('input');selectedId.type='hidden';selectedId.name='head_id';selectedId.value=c?.head_id||'';catalog.append(selectedId);
  let state={type:c?.club_type||'Driver',oem:'',model:'',year:'',variant:''};
- const unique=(arr)=>[...new Set(arr)].filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+ let loftRequest=0;
+ const unique=arr=>[...new Set(arr)].filter(v=>v!==null&&v!==undefined&&v!=='').sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+ async function refreshLofts(headId){
+  const token=++loftRequest;loftSelect.replaceChildren(new Option('Choose loft / enter manually',''));
+  if(!headId||mode.value!=='lookup')return;
+  try{const vals=await getLiveLofts(headId);if(token!==loftRequest)return;vals.forEach(v=>loftSelect.add(new Option(v+'°',v+'°')));}
+  catch(e){if(token===loftRequest)status('Loft lookup unavailable: '+e.message,true);}
+ }
+ loftSelect.addEventListener('change',()=>{if(loftSelect.value)loft.querySelector('input').value=loftSelect.value;});
  function draw(){
+  if(mode.value!=='lookup')return;
   const base=headCatalog.filter(h=>h.type===state.type&&(check.checked||h.year>=2015));
   const oems=unique(base.map(h=>h.oem));if(!oems.includes(state.oem))state.oem='';
   const models=unique(base.filter(h=>h.oem===state.oem).map(h=>h.model));if(!models.includes(state.model))state.model='';
@@ -102,24 +116,54 @@ async function editClub(c){
   const make=(label,vals,key)=>{const f=selectField(label,vals,state[key],v=>{state[key]=v;draw();});filters.append(f.wrap);};
   make('OEM',oems,'oem');make('Model',models,'model');make('Release year',years,'year');make('Variant',variants,'variant');
   const match=base.find(h=>h.oem===state.oem&&h.model===state.model&&String(h.year)===String(state.year)&&h.variant===state.variant);
-  if(match){if(selectedId.value!==match.id)refreshLofts(match.id);selectedId.value=match.id;head.querySelector('input').value=[match.oem,match.model,match.variant!=='Standard'?match.variant:''].filter(Boolean).join(' ');}else{refreshLofts('');}
+  if(match){
+   if(selectedId.value!==match.id)refreshLofts(match.id);
+   selectedId.value=match.id;
+   head.querySelector('input').value=[match.oem,match.model,match.variant!=='Standard'?match.variant:''].filter(Boolean).join(' ');
+  }else{selectedId.value='';refreshLofts('');}
  }
- type.querySelector('select').addEventListener('change',e=>{state={type:e.target.value,oem:'',model:'',year:'',variant:''};selectedId.value='';draw();});
+ function setMode(next){
+  mode.value=next;
+  lookupPanel.hidden=next==='manual';
+  if(next==='manual'){
+   selectedId.value='';refreshLofts('');
+   modeNote.textContent='Enter any club description below. No HeadDB link is required; shaft, grip and loft remain editable.';
+  }else{
+   modeNote.textContent=catalogLoadError?'FIS lookup unavailable: '+catalogLoadError+'. You can switch to Manual entry.':'Select a head below. The description will fill automatically; you can edit other fields.';
+   draw();
+  }
+ }
+ mode.addEventListener('change',async()=>{
+  setMode(mode.value);
+  if(mode.value==='lookup'){await loadLiveHeads();if($('editor').open&&mode.value==='lookup')draw();}
+ });
+ type.querySelector('select').addEventListener('change',e=>{
+  state={type:e.target.value,oem:'',model:'',year:'',variant:''};selectedId.value='';
+  if(!c&&e.target.value==='Putter')setMode('manual');
+  else if(mode.value==='lookup')draw();
+ });
  check.addEventListener('change',()=>{selectedId.value='';draw();});
- head.querySelector('input').addEventListener('input',()=>{selectedId.value='';});
- catalog.addEventListener('change',e=>{if(e.target.tagName==='SELECT')selectedId.value='';});
- if(c?.head_id){const match=headCatalog.find(h=>h.id===c.head_id);if(match){state={type:match.type,oem:match.oem,model:match.model,year:String(match.year),variant:match.variant};check.checked=match.year<2015;}}
- draw();
- if(c?.head_id)refreshLofts(c.head_id);
+ head.querySelector('input').addEventListener('input',()=>{if(mode.value==='lookup')selectedId.value='';});
+ // Do not clear the selected HeadID for the optional loft dropdown.
+ const initialManual=!c?.head_id&&(!!c||type.querySelector('select').value==='Putter');
+ setMode(initialManual?'manual':'lookup');
  editor(c?'Edit club':'Add club',[type,catalog,quantity,head,loft,shaft,grip,sort],async v=>{
-  v.quantity=Number(v.quantity);v.sort_order=Number(v.sort_order);v.head_model=v.head_model.trim();v.head_id=v.head_id||null;
+  v.quantity=Number(v.quantity);v.sort_order=Number(v.sort_order);v.head_model=v.head_model.trim();
+  v.head_id=mode.value==='manual'?null:(selectedId.value||null);
   if(!Number.isInteger(v.quantity)||v.quantity<1||v.quantity>99)throw Error('Quantity must be 1–99.');
   if(!Number.isInteger(v.sort_order))throw Error('Sort order must be an integer.');
   if(!v.head_model)throw Error('Head model is required.');
   const query=c?client.from('acim_clubs').update(v).eq('club_id',c.club_id):client.from('acim_clubs').insert({...v,associate_id:id});
   const {error}=await query;if(error)throw error;await loadClubs();status('Club saved.');
  });
+ // Load live reference data only when the user needs the selector.
+ if(mode.value==='lookup'){
+  await loadLiveHeads();
+  if(c?.head_id){const match=headCatalog.find(h=>h.id===c.head_id);if(match){state={type:match.type,oem:match.oem,model:match.model,year:String(match.year),variant:match.variant};check.checked=match.year<2015;}}
+  if($('editor').open){draw();if(c?.head_id)refreshLofts(c.head_id);}
+ }
 }
+
 async function toggleClub(c){if(!confirm(`${c.active_flag?'Deactivate':'Restore'} ${c.club_type} · ${c.head_model}?`))return;const {error}=await client.from('acim_clubs').update({active_flag:!c.active_flag}).eq('club_id',c.club_id);if(error)return status(error.message,true);await loadClubs();status('Club status updated.');}
 function renderClubAdmin(){const root=$('clubAdmin');root.replaceChildren();const list=allClubs.filter(c=>$('includeInactiveClubs').checked||c.active_flag);if(!list.length){const p=document.createElement('p');p.className='muted';p.textContent='No clubs to manage for the selected associate.';root.append(p);return;}for(const c of list){const r=document.createElement('div');r.className='admin-item'+(c.active_flag?'':' inactive');const t=document.createElement('div');const strong=document.createElement('strong');strong.textContent=`${c.club_type} · ${c.head_model}${c.active_flag?'':' [inactive]'}`;const meta=document.createElement('div');meta.className='muted';meta.textContent=`Qty ${c.quantity} · ${[c.loft_set_makeup,c.shaft_model,c.grip].filter(Boolean).join(' · ')}`;t.append(strong,meta);const actions=document.createElement('div');actions.className='toolbar';const edit=document.createElement('button');edit.className='secondary';edit.textContent='Edit';edit.onclick=()=>editClub(c);const toggle=document.createElement('button');toggle.className='secondary';toggle.textContent=c.active_flag?'Deactivate':'Restore';toggle.onclick=()=>toggleClub(c);actions.append(edit,toggle);r.append(t,actions);root.append(r);}}
 function wireManagement(){$('cancelEditor').onclick=()=>$('editor').close();$('newAssociate').onclick=()=>editAssociate(null);$('editAssociate').onclick=()=>{const a=allAssociates.find(x=>x.associate_id===$('associate').value);if(a)editAssociate(a);else status('Select an associate first.',true);};$('toggleAssociate').onclick=toggleAssociate;$('newClub').onclick=()=>editClub(null);$('includeInactive').onchange=()=>{associates=allAssociates.filter(a=>$('includeInactive').checked||a.active_flag);renderAssociates();};$('includeInactiveClubs').onchange=renderClubAdmin;}
